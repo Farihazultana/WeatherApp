@@ -1,106 +1,110 @@
 package com.example.weatherapp
 
-import android.net.wifi.rtt.CivicLocationKeys.CITY
 import android.os.AsyncTask
-import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.view.View
-import androidx.annotation.RequiresApi
+import android.widget.ProgressBar
+import android.widget.RelativeLayout
+import androidx.appcompat.app.AppCompatActivity
+import androidx.databinding.DataBindingUtil
 import com.example.weatherapp.databinding.ActivityMainBinding
+import com.google.android.material.snackbar.Snackbar
 import org.json.JSONObject
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.*
 
-class MainActivity : AppCompatActivity() {
-
-    var city: String = "Dhaka, BD"
-    var API: String = "08ee7b0842cb82b1a2628af4a57dc705"
+class MainActivity : AppCompatActivity(){
 
     private lateinit var binding: ActivityMainBinding
+    private val city = "Dhaka,BD"
+    private val apiKey = "b52eb4317078fe9bdd42f07a1e559b3c"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        val view = binding.root
-        setContentView(view)
+        binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
+        binding.info.setOnClickListener {
+            Snackbar.make(binding.mainContainer, "Created by Fariha Sultana", Snackbar.LENGTH_SHORT).show()
+        }
+        weatherTask().execute()
 
-        weatherTask.execute()
     }
 
-    inner class weatherTask() : AsyncTask<String, Void, String>() {
+    inner class weatherTask : AsyncTask<String, Void, String>() {
 
-        override fun onPreExecute() {
-            super.onPreExecute()
-            binding.loader.visibility = View.VISIBLE
-            binding.mainContainer.visibility = View.GONE
-            binding.errorText.visibility = View.GONE
-        }
-
-        @RequiresApi(Build.VERSION_CODES.Q)
         override fun doInBackground(vararg p0: String?): String {
-            var response: String? = try {
-                URL("https://api.openweathermap.org/data/2.5/weather?q=$CITY&units=metric&appid=$API")
-                    .readText(Charsets.UTF_8)
-            } catch (e: java.lang.Exception) {
-                null
+            var response = ""
+            try {
+                val url = "https://api.openweathermap.org/data/2.5/weather?q=$city&units=metric&appid=$apiKey"
+                response = URL(url).readText(Charsets.UTF_8)
+            } catch (e: Exception) {
+                Log.e("WeatherApp", "Error fetching weather data", e)
             }
-            return response!!
+            return response
         }
 
         override fun onPostExecute(result: String?) {
             super.onPostExecute(result)
-            try {
-                val jsonObject = JSONObject(result)
-                val main = jsonObject.getJSONObject("main")
-                val sys = jsonObject.getJSONObject("sys")
-                val wind = jsonObject.getJSONObject("wind")
-                val weather = jsonObject.getJSONArray("weather").getJSONObject(0)
-                val updateAt: Long = jsonObject.getLong("dt")
-                val updatedAtText =
-                    "Updated at : " + SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.ENGLISH).format(
-                        Date()
-                    )
-                val temp = main.getString("temp") + "℃"
-                val tempMin = "Min Temp: " + main.getString("temp_min") + "℃"
-                val tempMax = "Max Temp: " + main.getString("temp_max") + "℃"
-                val pressure = main.getString("pressure")
-                val humidity = main.getString("humidity")
-                val sunrise: Long = sys.getLong("sunrise")
-                val sunset: Long = sys.getLong("sunset")
-                val windSpeed = wind.getString("speed")
-                val weatherDescription = weather.getString("description")
-                val address = jsonObject.getString("name") + " , " + sys.getString("country")
+            if (!result.isNullOrEmpty()) {
+                try {
+                    val jsonObject = JSONObject(result)
+                    // Parse the JSON response and update UI accordingly
+                    val main = jsonObject.getJSONObject("main")
+                    val sys = jsonObject.getJSONObject("sys")
+                    val wind = jsonObject.getJSONObject("wind")
+                    val weather = jsonObject.getJSONArray("weather").getJSONObject(0)
+                    val updateAt: Long = jsonObject.getLong("dt")
+                    val updatedAtText =
+                        "Updated At : " + SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.ENGLISH).format(
+                            Date(updateAt*1000)
+                        )
+                    val temp = main.getString("temp") + "℃"
+                    val tempMin = "Min Temp: " + main.getString("temp_min") + "℃"
+                    val tempMax = "Max Temp: " + main.getString("temp_max") + "℃"
+                    val pressure = main.getString("pressure")
+                    val humidity = main.getString("humidity")
+                    val sunrise: Long = sys.getLong("sunrise")
+                    val sunset: Long = sys.getLong("sunset")
+                    val windSpeed = wind.getString("speed")
+                    val weatherDescription = weather.getString("description")
+                    val address = jsonObject.getString("name") + " , " + sys.getString("country")
 
-                binding.address.text = address
-                binding.updatedAt.text = updatedAtText
-                binding.status.text = weatherDescription.replaceFirstChar {
-                    if (it.isLowerCase()) it.titlecase(
-                        Locale.getDefault()
-                    ) else it.toString()
+                    binding.address.text = address
+                    binding.updatedAt.text = updatedAtText
+                    binding.status.text = weatherDescription.replaceFirstChar {
+                        if (it.isLowerCase()) it.titlecase(
+                            Locale.getDefault()
+                        ) else it.toString()
+                    }
+                    binding.temp.text = temp
+                    binding.tempMin.text = tempMin
+                    binding.tempMax.text = tempMax
+                    binding.sunrise.text =
+                        SimpleDateFormat("hh:mm a", Locale.ENGLISH).format(Date(sunrise * 1000))
+                    binding.sunset.text =
+                        SimpleDateFormat("hh:mm a", Locale.ENGLISH).format(Date(sunset * 1000))
+                    binding.wind.text = windSpeed
+                    binding.pressure.text = pressure
+                    binding.humidity.text = humidity
+
+
+                    findViewById<ProgressBar>(R.id.loader).visibility = View.GONE
+                    findViewById<RelativeLayout>(R.id.mainContainer).visibility = View.VISIBLE
+
+                } catch (e: Exception) {
+                    Log.e("WeatherApp", "Error parsing JSON response", e)
+                    showErrorMessage()
                 }
-                binding.temp.text = temp
-                binding.tempMin.text = tempMin
-                binding.tempMax.text = tempMax
-                binding.sunrise.text =
-                    SimpleDateFormat("hh:mm a", Locale.ENGLISH).format(Date(sunrise * 1000))
-                binding.sunset.text =
-                    SimpleDateFormat("hh:mm a", Locale.ENGLISH).format(Date(sunset * 1000))
-                binding.wind.text = windSpeed
-                binding.pressure.text = pressure
-                binding.humidity.text = humidity
-
-                //disable progressbar and enable main container
-                binding.loader.visibility = View.GONE
-                binding.mainContainer.visibility = View.VISIBLE
-
-
-            } catch (e: Exception) {
-                binding.loader.visibility = View.GONE
-                binding.errorText.visibility = View.VISIBLE
+            } else {
+                showErrorMessage()
             }
+        }
 
+        private fun showErrorMessage() {
+            binding.loader.visibility = View.GONE
+            binding.mainContainer.visibility = View.GONE
+            binding.errorText.visibility = View.VISIBLE
         }
     }
 }
